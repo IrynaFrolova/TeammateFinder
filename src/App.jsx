@@ -6,6 +6,7 @@ import CreatePostDialog from './components/CreatePostDialog.jsx'
 import EditPostDialog from './components/EditPostDialog.jsx'
 import MessageDialog from './components/MessageDialog.jsx'
 import ImportExport from './components/ImportExport.jsx'
+import RegisterDialog from './components/RegisterDialog.jsx'
 import { DICT, initialPosts as seed } from './data.js'
 
 
@@ -84,7 +85,17 @@ export default function App() {
   const [posts, setPosts] = useLocalPosts(seed)
   const [games, setGames] = useState(DICT.games)
 
-  
+  const registerDlgRef = useRef(null)
+  const [username, setUsername] = useState(() => localStorage.getItem('username') || '')
+  useEffect(() => {
+  if (!username) registerDlgRef.current?.showModal()
+  }, [username])
+  const handleRegister = (name) => {
+  setUsername(name)
+  localStorage.setItem('username', name)
+}
+
+
 
   const init = parseURLState()
   const [q, setQ] = useState(init.q)
@@ -101,19 +112,6 @@ export default function App() {
 
 
 
-const onLike = (id) => {
-  const already = liked.has(id)
-  setLiked(prev => {
-    const next = new Set(prev)
-    already ? next.delete(id) : next.add(id)
-    return next
-  })
-  setPosts(list =>
-    list.map(p =>
-      p.id === id ? { ...p, likes: (p.likes || 0) + (already ? -1 : 1) } : p
-    )
-  )
-}
 
 
 
@@ -217,7 +215,7 @@ const onLike = (id) => {
       time: obj.time,
       tags: (obj.tags||'').split(',').map(t=>t.trim()).filter(Boolean),
       desc: (obj.desc||'').trim(),
-      author: { name: 'You' },
+      author: { name: username || 'Guest' },
       createdAt: new Date().toISOString()
     }
     if (!newPost.title || !newPost.game) { alert('Please fill Title and Game/Hobby'); return false }
@@ -433,6 +431,11 @@ const onLike = (id) => {
         onCancel={closeMessage}
         onSend={sendMessage}
       />
+      <RegisterDialog
+        ref={registerDlgRef}
+        onSave={handleRegister}
+      />
+
     </>
   )
 }
