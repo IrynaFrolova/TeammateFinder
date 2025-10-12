@@ -5,7 +5,6 @@ import Grid from "./components/Grid.jsx";
 import CreatePostDialog from "./components/CreatePostDialog.jsx";
 import EditPostDialog from "./components/EditPostDialog.jsx";
 import MessageDialog from "./components/MessageDialog.jsx";
-import ImportExport from "./components/ImportExport.jsx";
 import AuthDialog from "./components/RegisterDialog.jsx";
 import { DICT, initialPosts as seed } from "./data.js";
 
@@ -382,12 +381,6 @@ export default function App() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const handleImport = (data) => {
-    /* ... no changes ... */
-  };
-  const handleExport = () => {
-    /* ... no changes ... */
-  };
 
   return (
     <>
@@ -445,7 +438,6 @@ export default function App() {
               <option value="date">Newest</option>
               <option value="title">Title A–Z</option>
             </select>
-            <ImportExport onImport={handleImport} onExport={handleExport} />
           </div>
         </div>
 
