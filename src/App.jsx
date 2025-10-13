@@ -100,7 +100,11 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authError, setAuthError] = useState("");
   const authDlgRef = useRef(null);
+  const [isToolbarOpen, setIsToolbarOpen] = useState(false);
 
+  const toggleToolbar = () => {
+    setIsToolbarOpen(!isToolbarOpen);
+  };
   const handleLogin = async (credentials) => {
     setAuthError("");
     try {
@@ -370,9 +374,7 @@ export default function App() {
     msgDlgRef.current?.close();
     setMessageTarget(null);
   };
-  const sendMessage = async ({ text, contact }) => {
-    /* ... no changes ... */
-  };
+  const sendMessage = async ({ text, contact }) => {};
 
   useEffect(() => {
     const hash = location.hash.slice(1);
@@ -381,101 +383,105 @@ export default function App() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-
   return (
     <>
-      <Header
-        q={q}
-        setQ={setQ}
-        onSearch={() => {}}
-        onClear={clearAll}
-        onCreate={openCreate}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        count={filtered.length}
-        theme={theme}
-        setTheme={setTheme}
-        user={currentUser}
-        onLogout={handleLogout}
-        onLoginClick={() => authDlgRef.current?.showModal()}
-      />
+      <div className="animate-on-load" style={{ animationDelay: "0.1s" }}>
+        <Header
+          q={q}
+          setQ={setQ}
+          onClear={clearAll}
+          onCreate={openCreate}
+          count={filtered.length}
+          theme={theme}
+          setTheme={setTheme}
+          toggleToolbar={toggleToolbar}
+          user={currentUser}
+          onLogout={handleLogout}
+          onLoginClick={() => authDlgRef.current?.showModal()}
+        />
+      </div>
 
-      <main className="wrap">
+      <main className="wrap main-layout">
         <Toolbar
           dict={{ ...DICT, games }}
           selectedTags={selectedTags}
           toggleTag={toggleTag}
           flt={flt}
           setFlt={setFlt}
+          className={isToolbarOpen ? "is-open" : ""}
+          onClose={toggleToolbar}
         />
-
-        <div className="resultbar" style={{ gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={savedOnly}
-                onChange={(e) => setSavedOnly(e.target.checked)}
-              />
-              <span>Saved only</span>
-            </label>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span>Sort by</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              id="sortBy"
-            >
-              <option value="score">Best match</option>
-              <option value="date">Newest</option>
-              <option value="title">Title A–Z</option>
-            </select>
-          </div>
-        </div>
-
-        {visible.length === 0 ? (
-          <div className="empty">No results. Try removing some filters.</div>
-        ) : (
-          <>
-            <Grid
-              items={visible}
-              formatAgo={formatAgo}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-              onMessage={openMessage}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onCopyLink={onCopyLink}
-              currentUser={currentUser}
-            />
-            {hasMore && (
-              <div
+        <div
+          className="content-area animate-on-load"
+          style={{ animationDelay: "0.3s" }}
+        >
+          <div className="resultbar" style={{ gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <label
                 style={{
                   display: "flex",
-                  justifyContent: "center",
-                  margin: "16px 0",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
                 }}
               >
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => setPage((p) => p + 1)}
+                <input
+                  type="checkbox"
+                  checked={savedOnly}
+                  onChange={(e) => setSavedOnly(e.target.checked)}
+                />
+                <span>Saved only</span>
+              </label>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span>Sort by</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                id="sortBy"
+              >
+                <option value="score">Best match</option>
+                <option value="date">Newest</option>
+                <option value="title">Title A–Z</option>
+              </select>
+            </div>
+          </div>
+          {visible.length === 0 ? (
+            <div className="empty">No results. Try removing some filters.</div>
+          ) : (
+            <>
+              <Grid
+                items={visible}
+                formatAgo={formatAgo}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onMessage={openMessage}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onCopyLink={onCopyLink}
+                currentUser={currentUser}
+              />
+              {hasMore && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    margin: "16px 0",
+                  }}
                 >
-                  Load more
-                </button>
-              </div>
-            )}
-            <div ref={sentinelRef} style={{ height: 1 }} />
-          </>
-        )}
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Load more
+                  </button>
+                </div>
+              )}
+              <div ref={sentinelRef} style={{ height: 1 }} />
+            </>
+          )}
+        </div>
       </main>
 
       <CreatePostDialog
