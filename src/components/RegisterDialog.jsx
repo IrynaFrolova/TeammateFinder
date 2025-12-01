@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useState, useRef } from "react";
-import { API_BASE } from "../config"; // <--- 1. ІМПОРТ
+import { API_BASE } from "../config";
 
 const AuthDialog = forwardRef(
   ({ onLogin, onRegister, onGoogleLogin, error }, ref) => {
@@ -24,10 +24,10 @@ const AuthDialog = forwardRef(
       e.preventDefault();
       setLocalError("");
       
-      // --- ВИКОРИСТОВУЄМО API_BASE ТУТ ---
+
       const url = mode === "login" 
-        ? `${API_BASE}/login` 
-        : `${API_BASE}/register`;
+        ? API_BASE + '/login' 
+        : API_BASE + '/register';
       
       const body = mode === "login" 
         ? { email, password }

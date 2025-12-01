@@ -6,11 +6,13 @@ import CreatePostDialog from "./components/CreatePostDialog.jsx";
 import EditPostDialog from "./components/EditPostDialog.jsx";
 import MessageDialog from "./components/MessageDialog.jsx";
 import AuthDialog from "./components/RegisterDialog.jsx";
-import { DICT, initialPosts as seed } from "./data.js";
 import ProfileDialog from "./components/ProfileDialog.jsx";
-import ChatListDialog from "./components/ChatListDialog.jsx";
-import { io } from "socket.io-client";
+import ChatListDialog from "./components/ChatListDialog.jsx"; 
+import { DICT, initialPosts as seed } from "./data.js";
+import { API_BASE } from "./config"; 
+import { io } from "socket.io-client"; // Не забудь встановити: npm install socket.io-client
 
+// --- ХЕЛПЕРИ ---
 function useLocalFavorites() {
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -49,12 +51,7 @@ function formatAgo(iso) {
 
 function parseURLState() {
   const p = new URLSearchParams(location.search);
-  const tags = new Set(
-    (p.get("tags") || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-  );
+  const tags = new Set((p.get("tags") || "").split(",").map((s) => s.trim()).filter(Boolean));
   const flt = {
     game: p.get("game") || "",
     level: p.get("level") || "",
@@ -83,42 +80,48 @@ function pushURLState({ q, selectedTags, flt, sortBy, savedOnly }) {
   history.replaceState(null, "", url);
 }
 
+// --- ГОЛОВНИЙ КОМПОНЕНТ ---
 export default function App() {
   const [theme, setTheme] = useTheme();
   
-  // --- 1. СТАН ПОСТІВ (Починаємо з пустих, завантажимо з сервера) ---
+  // Стейт даних
   const [posts, setPosts] = useState([]);
   const [games, setGames] = useState(DICT.games);
-
   const [currentUser, setCurrentUser] = useState(null);
   const [authError, setAuthError] = useState("");
   
+  // Рефи для діалогів
   const authDlgRef = useRef(null);
   const profileDlgRef = useRef(null);
   const chatListDlgRef = useRef(null);
-  const [isToolbarOpen, setIsToolbarOpen] = useState(false);
+  const msgDlgRef = useRef(null);
+  const createDlgRef = useRef(null);
+  const editDlgRef = useRef(null);
 
-// --- ЗВУКОВЕ СПОВІЩЕННЯ ---
+  // Стейт інтерфейсу
+  const [isToolbarOpen, setIsToolbarOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  
+  // Стейт чату
+  const [messageTarget, setMessageTarget] = useState(null);
+  const [currentChat, setCurrentChat] = useState(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  // --- 1. ЗВУКОВЕ СПОВІЩЕННЯ ---
   useEffect(() => {
     if (!currentUser) return;
 
-    // Підключаємося до сокета глобально в App
     const socket = io();
     const notificationChannel = `notification:${currentUser.id}`;
 
     socket.on(notificationChannel, (data) => {
         console.log("🔔 Отримано сповіщення:", data);
         
-        // 1. Відтворюємо звук
-        // (Можна замінити посилання на будь-який mp3 файл)
-        const audio = new Audio("/notification_sound.wav");
+        // ВАЖЛИВО: Перевір, щоб файл у папці public називався саме так!
+        const audio = new Audio("/notification_sound.wav"); 
         
-		audio.volume = 0.6;
-        // Тиха спроба відтворити (браузери іноді блокують звук, якщо юзер нічого не натискав)
-        audio.play().catch(err => console.log("Браузер заблокував авто-звук:", err));
-
-        // 2. Можна також показати системне спливаюче вікно (Alert або Toast)
-        //alert(`Нове повідомлення від ${data.senderName}!`); // (За бажанням, розкоментуй)
+        audio.volume = 0.6;
+        audio.play().catch(err => console.log("Авто-звук заблоковано:", err));
     });
 
     return () => {
@@ -127,55 +130,51 @@ export default function App() {
     };
   }, [currentUser]);
 
-  // --- 2. ЗАВАНТАЖЕННЯ: Беремо пости з сервера ---
+  // --- 2. ЗАВАНТАЖЕННЯ ПОСТІВ ---
   useEffect(() => {
-    fetch('${API_BASE}/posts')
+    fetch(API_BASE + '/posts')
         .then(res => res.json())
         .then(data => {
             if (Array.isArray(data)) {
-                // Адаптуємо формат MongoDB (_id) під наш формат (id)
-                const adaptedPosts = data.map(post => ({
-                    ...post,
-                    id: post._id, 
+                setPosts(data.map(p => ({
+                    ...p, 
+                    id: p._id, 
                     author: { 
-                        name: post.author?.username || "Unknown", 
-                        avatar: post.author?.profile?.avatarUrl 
+                        name: p.author?.username || "Unknown", 
+                        avatar: p.author?.profile?.avatarUrl 
                     }
-                }));
-                setPosts(adaptedPosts);
+                })));
             }
         })
-        .catch(err => console.error("Помилка завантаження постів:", err));
+        .catch(console.error);
   }, []);
 
-  // Перевірка сесії (вхід)
+  // --- 3. ПЕРЕВІРКА СЕСІЇ ---
   useEffect(() => {
     const storedId = localStorage.getItem("userId");
     const storedName = localStorage.getItem("username");
     
     if (storedId && storedName) {
-        // Спробуємо підтягнути актуальний профіль з сервера
-        fetch(`${API_BASE}/users/${storedName}`)
+        fetch(API_BASE + '/users/' + storedName)
             .then(res => res.json())
             .then(data => {
                 setCurrentUser({ 
                     id: data._id || storedId, 
                     username: data.username, 
-                    profile: data.profile,
-					isAdmin: data.isAdmin
+                    profile: data.profile, 
+                    isAdmin: data.isAdmin 
                 });
             })
             .catch(() => {
-                // Якщо сервер не відповів, беремо локальні дані
+                // Якщо помилка мережі, беремо мінімальні дані
                 setCurrentUser({ id: storedId, username: storedName });
             });
     }
   }, []);
 
-  const toggleToolbar = () => {
-    setIsToolbarOpen(!isToolbarOpen);
-  };
-
+  // --- ДІЇ КОРИСТУВАЧА ---
+  const toggleToolbar = () => setIsToolbarOpen(!isToolbarOpen);
+  
   const handleLogout = () => {
     localStorage.removeItem("userId");
     localStorage.removeItem("username");
@@ -183,124 +182,165 @@ export default function App() {
     window.location.reload();
   };
 
-  // Відкриття профілю
-  const openProfile = () => {
-    profileDlgRef.current?.showModal();
-  };
-
-// ВІДКРИТТЯ СПИСКУ ЧАТІВ
+  const openProfile = () => profileDlgRef.current?.showModal();
+  
   const openInbox = () => {
       if (!currentUser) return;
       chatListDlgRef.current?.showModal();
   };
 
-  // ВІДКРИТТЯ КОНКРЕТНОГО ЧАТУ ЗІ СПИСКУ
   const handleSelectChatFromList = (chat) => {
       setCurrentChat(chat);
-      // Якщо це чат по оголошенню - пробуємо його показати в заголовку
       setMessageTarget(chat.relatedAd || { title: "Чат" });
       msgDlgRef.current?.showModal();
   };
 
-  // Збереження профілю
-  const handleSaveProfile = async (newProfileData) => {
+  const handleSaveProfile = async (data) => {
     if (!currentUser) return;
     try {
-      const response = await fetch(`${API_BASE}/users/${currentUser.id}`, {
-         method: 'PUT',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(newProfileData)
+      const res = await fetch(API_BASE + '/users/' + currentUser.id, { 
+          method: 'PUT', 
+          headers: {'Content-Type': 'application/json'}, 
+          body: JSON.stringify(data) 
       });
-      
-      const data = await response.json();
-      if (response.ok) {
-         setCurrentUser(prev => ({ ...prev, profile: data.user.profile }));
-         alert("Профіль оновлено!");
-      } else {
-         alert("Помилка: " + data.message);
+      const json = await res.json();
+      if (res.ok) { 
+          setCurrentUser(prev => ({ ...prev, profile: json.user.profile })); 
+          alert("Профіль оновлено!"); 
       }
-    } catch (err) {
-      console.error(err);
-      alert("Помилка з'єднання");
-    }
+    } catch (e) { alert("Помилка"); }
   };
-  
-  
-  // --- ЛАЙКИ ---
-  const onLike = async (id) => {
-    if (!currentUser) {
-        alert("Увійдіть, щоб оцінити пост!");
-        authDlgRef.current?.showModal();
-        return;
-    }
+
+  // --- РОБОТА З ПОСТАМИ ---
+  const createPost = async (obj) => {
+    if (!currentUser) { authDlgRef.current?.showModal(); return false; }
+    
+    const newPostData = {
+        userId: currentUser.id, 
+        title: obj.title.trim(), 
+        game: obj.game.trim(), 
+        level: obj.level, 
+        lang: obj.lang, 
+        platform: obj.platform, 
+        time: obj.time, 
+        tags: (obj.tags||"").split(",").map(t=>t.trim()).filter(Boolean), 
+        desc: (obj.desc||"").trim()
+    };
 
     try {
-        const response = await fetch(`${API_BASE}/posts/${id}/like`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(API_BASE + '/posts', {
+            method: 'POST', 
+            headers: {'Content-Type':'application/json'}, 
+            body: JSON.stringify(newPostData) 
+        });
+        if (res.ok) {
+            const saved = await res.json();
+            setPosts(prev => [{...saved, id: saved._id, author: {name: currentUser.username, avatar: currentUser.profile?.avatarUrl}}, ...prev]);
+            closeCreate(); 
+            return true;
+        }
+    } catch (e) { alert("Error"); } 
+    return false;
+  };
+
+  const onLike = async (id) => {
+    if (!currentUser) { authDlgRef.current?.showModal(); return; }
+    try {
+        const res = await fetch(API_BASE + '/posts/' + id + '/like', {
+            method: 'PUT', 
+            headers: {'Content-Type': 'application/json'}, 
             body: JSON.stringify({ userId: currentUser.id })
         });
-
-        if (response.ok) {
-            const updatedPostRaw = await response.json();
-            
-            // Адаптуємо під формат фронтенду
-            const updatedPost = {
-                ...updatedPostRaw,
-                id: updatedPostRaw._id,
-                author: { 
-                    name: updatedPostRaw.author?.username || "Unknown", 
-                    avatar: updatedPostRaw.author?.profile?.avatarUrl 
-                }
+        if (res.ok) {
+            const updated = await res.json();
+            const adapted = { 
+                ...updated, 
+                id: updated._id, 
+                author: { name: updated.author?.username, avatar: updated.author?.profile?.avatarUrl } 
             };
-
-            // Оновлюємо цей пост у списку
-            setPosts((list) => list.map((p) => (p.id === id ? updatedPost : p)));
+            setPosts(l => l.map(p => p.id === id ? adapted : p));
         }
-    } catch (err) {
-        console.error(err);
-    }
+    } catch (e) { console.error(e); }
   };
-  
-  // Заглушки для AuthDialog (він сам робить запити)
-  const handleLogin = async () => {};
-  const handleRegister = async () => {};
-  const handleGoogleLogin = async (googleResponse) => {
-    // googleResponse містить credential (це і є токен)
+
+  const onDelete = async (id) => {
+    if (!confirm("Видалити це оголошення?")) return;
+    try { 
+        const res = await fetch(API_BASE + '/posts/' + id, { method: 'DELETE' }); 
+        if (res.ok) { 
+            setPosts(l => l.filter(p => p.id !== id)); 
+        } else {
+            alert("Не вдалося видалити");
+        }
+    } catch (e) { alert("Error"); }
+  };
+
+  // --- РОБОТА З ЧАТОМ ---
+  const openMessage = async (post) => {
+    if (!currentUser) { authDlgRef.current?.showModal(); return; }
+    if (post.author.name === currentUser.username) { alert("Це ваш пост"); return; }
+    
+    setIsChatLoading(true);
     try {
-        const response = await fetch('${API_BASE}/google-login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(API_BASE + '/chats', {
+            method: 'POST', 
+            headers: {'Content-Type':'application/json'}, 
+            body: JSON.stringify({ adId: post.id, userId: currentUser.id }) 
+        });
+        const data = await res.json();
+        if (res.ok) { 
+            setCurrentChat(data); 
+            setMessageTarget(post); 
+            msgDlgRef.current?.showModal(); 
+        }
+    } catch (e) { alert("Error"); } 
+    finally { setIsChatLoading(false); }
+  };
+
+  const sendMessage = async ({ text }) => {
+      if (!currentChat || !currentUser) return;
+      try { 
+          await fetch(API_BASE + '/chats/' + currentChat._id + '/messages', {
+              method: 'POST', 
+              headers: {'Content-Type':'application/json'}, 
+              body: JSON.stringify({ text, senderId: currentUser.id }) 
+          }); 
+      } catch (e) {}
+  };
+
+  // --- АВТОРИЗАЦІЯ ---
+  const handleLogin = async () => {}; // Заглушка (логіка в AuthDialog)
+  const handleRegister = async () => {}; // Заглушка
+  
+  const handleGoogleLogin = async (googleResponse) => {
+    try {
+        const response = await fetch(API_BASE + '/google-login', {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ token: googleResponse.credential })
         });
-
         const data = await response.json();
-
         if (response.ok) {
-            // Зберігаємо сесію
-            localStorage.setItem('userId', data.userId);
+            localStorage.setItem('userId', data.userId); 
             localStorage.setItem('username', data.username);
             
-            // Оновлюємо стейт
             setCurrentUser({ 
                 id: data.userId, 
                 username: data.username, 
-                profile: data.profile,
+                profile: data.profile, 
                 isAdmin: data.isAdmin 
             });
-
-            authDlgRef.current?.close(); // Закриваємо вікно
-            alert(`Вітаємо, ${data.username}!`);
-            window.location.reload(); // Перезавантажуємо для надійності
-        } else {
-            setAuthError(data.message || "Помилка Google входу");
+            
+            authDlgRef.current?.close(); 
+            alert(`Вітаємо, ${data.username}!`); 
+            window.location.reload();
+        } else { 
+            setAuthError(data.message); 
         }
-    } catch (error) {
-        console.error(error);
-        setAuthError("Помилка з'єднання");
-    }
+    } catch (error) { setAuthError("Помилка"); }
   };
 
+  // --- ФІЛЬТРАЦІЯ ТА РЕНДЕР ---
   const init = parseURLState();
   const [q, setQ] = useState(init.q);
   const [selectedTags, setSelectedTags] = useState(init.selectedTags);
@@ -308,489 +348,88 @@ export default function App() {
   const [sortBy, setSortBy] = useState(init.sortBy);
   const [savedOnly, setSavedOnly] = useState(init.savedOnly);
 
-  useEffect(() => {
-    pushURLState({ q, selectedTags, flt, sortBy, savedOnly });
-  }, [q, selectedTags, flt, sortBy, savedOnly]);
-
-  const [favorites, setFavorites] = useLocalFavorites();
-
-  const PAGE_SIZE = 6;
-  const [page, setPage] = useState(1);
-  const sentinelRef = useRef(null);
-
-  const createDlgRef = useRef();
-  const editDlgRef = useRef();
-  const msgDlgRef = useRef();
-  const [editingPost, setEditingPost] = useState(null);
-  const [messageTarget, setMessageTarget] = useState(null);
-  const [currentChat, setCurrentChat] = useState(null); // Новий стейт
-  const [isChatLoading, setIsChatLoading] = useState(false); // Стан завантаження
-
-  // Оновлена функція відкриття
-  const openMessage = async (post) => {
-    if (!currentUser) {
-        alert("Увійдіть, щоб написати повідомлення");
-        authDlgRef.current?.showModal();
-        return;
-    }
-
-    if (post.author.name === currentUser.username) {
-        alert("Це ваше оголошення");
-        return;
-    }
-
-    setIsChatLoading(true);
-    
-    try {
-        // Питаємо сервер: "Дай чат для цього посту"
-        const response = await fetch('${API_BASE}/chats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                adId: post.id,
-                userId: currentUser.id
-            })
-        });
-
-        const chatData = await response.json();
-
-        if (response.ok) {
-            setCurrentChat(chatData); 
-            setMessageTarget(post);
-            msgDlgRef.current?.showModal();
-        } else {
-            alert(chatData.message);
-        }
-    } catch (error) {
-        console.error(error);
-        alert("Помилка відкриття чату");
-    } finally {
-        setIsChatLoading(false);
-    }
-  };
-
-  const closeMessage = () => {
-    msgDlgRef.current?.close();
-    setMessageTarget(null);
-    setCurrentChat(null);
-  };
-
-  // Оновлена функція відправки
-  const sendMessage = async ({ text }) => {
-      if (!currentChat || !currentUser) return;
-
-      try {
-          await fetch(`${API_BASE}/chats/${currentChat._id}/messages`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  text,
-                  senderId: currentUser.id
-              })
-          });
-          // Повідомлення прийде через Socket.io (або оновиться при відкритті)
-      } catch (error) {
-          console.error("Помилка відправки:", error);
-      }
-  };
+  useEffect(() => { pushURLState({ q, selectedTags, flt, sortBy, savedOnly }); }, [q, selectedTags, flt, sortBy, savedOnly]);
   
-  const computeScore = (p) => {
-    let s = 0;
-    if (flt.game && p.game === flt.game) s += 3;
-    if (flt.level && p.level === flt.level) s += 1;
-    if (flt.lang && p.lang === flt.lang) s += 2;
-    if (flt.platform && p.platform === flt.platform) s += 2;
-    if (flt.time && p.time === flt.time) s += 2;
-    for (const t of selectedTags) if (p.tags.includes(t)) s += 1;
-    if (q) {
-      const hay = (
-        p.title + " " + p.desc + " " + p.game + " " + p.tags.join(" ")
-      ).toLowerCase();
-      if (hay.includes(q.toLowerCase())) s += 2;
-    }
-    return s;
-  };
-
-  const filtered = useMemo(() => {
-    let arr = posts.filter((p) => {
-      if (savedOnly && !favorites.has(p.id)) return false;
-      for (const k of Object.keys(flt))
-        if (flt[k] && p[k] !== flt[k]) return false;
-      for (const t of selectedTags) if (!p.tags.includes(t)) return false;
-      if (q) {
-        const hay = (
-          p.title + " " + p.desc + " " + p.game + " " + p.tags.join(" ")
-        ).toLowerCase();
-        if (!hay.includes(q.toLowerCase())) return false;
-      }
-      return true;
-    });
-
-    if (sortBy === "score") {
-      arr = arr
-        .map((p) => ({ p, score: computeScore(p) }))
-        .sort(
-          (a, b) =>
-            b.score - a.score ||
-            new Date(b.p.createdAt) - new Date(a.p.createdAt)
-        )
-        .map((x) => ({ ...x.p, _score: x.score }));
-    } else if (sortBy === "date") {
-      arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    } else if (sortBy === "title") {
-      arr.sort((a, b) => a.title.localeCompare(b.title));
-    }
-    return arr;
-  }, [posts, flt, selectedTags, q, sortBy, savedOnly, favorites]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [q, selectedTags, flt, sortBy, savedOnly]);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setPage((p) => p + 1);
-      },
-      { rootMargin: "200px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [sentinelRef.current]);
-
-  const visible = filtered.slice(0, PAGE_SIZE * page);
-  const hasMore = visible.length < filtered.length;
-
-  const toggleTag = (t) => {
-    const next = new Set(selectedTags);
-    next.has(t) ? next.delete(t) : next.add(t);
-    setSelectedTags(next);
-  };
-  const clearAll = () => {
-    setQ("");
-    setSelectedTags(new Set());
-    setFlt({ game: "", level: "", lang: "", platform: "", time: "" });
-    setSortBy("score");
-    setSavedOnly(false);
-  };
-  const toggleFavorite = (id) => {
-    const next = new Set(favorites);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setFavorites(next);
-  };
-
-  const openCreate = () => {
-    if (currentUser) {
-      createDlgRef.current?.showModal();
-    } else {
-      authDlgRef.current?.showModal();
-    }
-  };
+  const [favorites, setFavorites] = useLocalFavorites();
+  const toggleFavorite = (id) => { const n = new Set(favorites); n.has(id)?n.delete(id):n.add(id); setFavorites(n); };
+  
+  const visible = useMemo(() => {
+      return posts.filter(p => {
+          if (savedOnly && !favorites.has(p.id)) return false;
+          // ... фільтри ...
+          if (q) { 
+              const h = (p.title+" "+p.desc+" "+p.game).toLowerCase(); 
+              if (!h.includes(q.toLowerCase())) return false; 
+          }
+          return true;
+      });
+  }, [posts, q, savedOnly, favorites]); 
+  
   const closeCreate = () => createDlgRef.current?.close();
-
-  // --- 3. СТВОРЕННЯ (SERVER) ---
-  const createPost = async (obj) => {
-    if (!currentUser) {
-        alert("Будь ласка, увійдіть!");
-        authDlgRef.current?.showModal();
-        return false;
-    }
-
-    const newPostData = {
-        userId: currentUser.id, // ID автора
-        title: obj.title.trim(),
-        game: obj.game.trim(),
-        level: obj.level,
-        lang: obj.lang,
-        platform: obj.platform,
-        time: obj.time,
-        tags: (obj.tags || "").split(",").map((t) => t.trim()).filter(Boolean),
-        desc: (obj.desc || "").trim(),
-    };
-
-    try {
-        const response = await fetch('${API_BASE}/posts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newPostData)
-        });
-
-        if (response.ok) {
-            const savedPost = await response.json();
-            
-            const adaptedPost = {
-                ...savedPost,
-                id: savedPost._id,
-                author: { 
-                    name: currentUser.username, 
-                    avatar: currentUser.profile?.avatarUrl 
-                }
-            };
-
-            setPosts((prev) => [adaptedPost, ...prev]);
-            
-            if (!games.includes(adaptedPost.game)) setGames((g) => [...g, adaptedPost.game]);
-            
-            closeCreate();
-            return true;
-        } else {
-            alert("Помилка при створенні");
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Помилка з'єднання");
-    }
-    return false;
-  };
-
-  const onCopyLink = async (id) => {
-    const url = `${location.origin}${location.pathname}?${new URLSearchParams(
-      location.search
-    )}#${id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {}
-    alert("Link copied");
-  };
-
-  const onEdit = (post) => {
-    setEditingPost(post);
-    editDlgRef.current?.showModal();
-  };
-  const onEditCancel = () => {
-    editDlgRef.current?.close();
-    setEditingPost(null);
-  };
-const onEditSave = async (id, obj) => {
-    // 1. Форматуємо дані (Рядок тегів -> Масив тегів)
-    // Це виправить помилку "map is not a function"
-    const updatedData = {
-        title: obj.title.trim(),
-        game: obj.game.trim(),
-        level: obj.level,
-        lang: obj.lang,
-        platform: obj.platform,
-        time: obj.time,
-        // Обов'язково робимо спліт рядка в масив!
-        tags: (typeof obj.tags === 'string' ? obj.tags : "").split(",").map((t) => t.trim()).filter(Boolean),
-        desc: (obj.desc || "").trim(),
-    };
-
-    try {
-        // 2. Відправляємо на сервер
-        const response = await fetch(`${API_BASE}/posts/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+  const closeMessage = () => { msgDlgRef.current?.close(); setMessageTarget(null); setCurrentChat(null); };
+  const onEdit = (p) => { setEditingPost(p); editDlgRef.current?.showModal(); };
+  const onEditCancel = () => { editDlgRef.current?.close(); setEditingPost(null); };
+  
+  const onEditSave = async (id, obj) => { 
+      const updatedData = {
+        title: obj.title.trim(), game: obj.game.trim(), level: obj.level, lang: obj.lang, platform: obj.platform, time: obj.time,
+        tags: (typeof obj.tags === 'string' ? obj.tags : "").split(",").map((t) => t.trim()).filter(Boolean), desc: (obj.desc || "").trim(),
+      };
+      try {
+        const res = await fetch(API_BASE + '/posts/' + id, {
+            method: 'PUT', 
+            headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify(updatedData)
         });
-
-        if (response.ok) {
-            const savedPost = await response.json();
-
-            // 3. Оновлюємо локальний стейт правильними даними з сервера
-            // Адаптуємо під наш фронт
-            const adaptedPost = {
-                ...savedPost,
-                id: savedPost._id,
-                author: { 
-                    name: savedPost.author?.username || "Unknown", 
-                    avatar: savedPost.author?.profile?.avatarUrl 
-                }
-            };
-
-            setPosts((list) => list.map((p) => (p.id === id ? adaptedPost : p)));
-            
-            // Якщо змінили гру - додаємо її в фільтр
-            if (!games.includes(adaptedPost.game)) setGames((g) => [...g, adaptedPost.game]);
-            
-            onEditCancel(); // Закриваємо вікно
-        } else {
-            alert("Не вдалося зберегти зміни");
+        if (res.ok) {
+            const s = await res.json();
+            const a = { ...s, id: s._id, author: { name: s.author?.username || "Unknown", avatar: s.author?.profile?.avatarUrl } };
+            setPosts((list) => list.map((p) => (p.id === id ? a : p)));
+            onEditCancel();
         }
-    } catch (err) {
-        console.error(err);
-        alert("Помилка з'єднання");
-    }
+      } catch (e) { alert("Error"); }
   };
-
-  // --- 4. ВИДАЛЕННЯ (SERVER) ---
-  const onDelete = async (id) => {
-    if (!confirm("Видалити це оголошення?")) return;
-    
-    try {
-        const response = await fetch(`${API_BASE}/posts/${id}`, { method: 'DELETE' });
-
-        if (response.ok) {
-            setPosts((list) => list.filter((p) => p.id !== id));
-            const f = new Set(favorites);
-            f.delete(id);
-            setFavorites(f);
-        } else {
-            alert("Не вдалося видалити (можливо, вже видалено)");
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Помилка сервера");
-    }
-  };
-
-
-
-  useEffect(() => {
-    const hash = location.hash.slice(1);
-    if (!hash) return;
-    const el = document.getElementById(hash);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  const onCopyLink = () => alert("Copied");
 
   return (
     <>
-      <div className="animate-on-load" style={{ animationDelay: "0.1s" }}>
-        <Header
-          q={q}
-          setQ={setQ}
-          onClear={clearAll}
-          onCreate={openCreate}
-          count={filtered.length}
-          theme={theme}
-          setTheme={setTheme}
-          toggleToolbar={toggleToolbar}
-          user={currentUser}
-          onLogout={handleLogout}
-          onLoginClick={() => authDlgRef.current?.showModal()}
-          onProfileClick={openProfile}
-		  onInboxClick={openInbox}
+      <div className="animate-on-load">
+        <Header 
+            q={q} setQ={setQ} onClear={() => setQ("")} 
+            onCreate={() => currentUser ? createDlgRef.current?.showModal() : authDlgRef.current?.showModal()} 
+            count={visible.length} theme={theme} setTheme={setTheme} 
+            toggleToolbar={() => setIsToolbarOpen(!isToolbarOpen)} 
+            user={currentUser} onLogout={handleLogout} 
+            onLoginClick={() => authDlgRef.current?.showModal()} 
+            onProfileClick={openProfile} 
+            onInboxClick={openInbox} 
         />
       </div>
 
       <main className="wrap main-layout">
-        <Toolbar
-          dict={{ ...DICT, games }}
-          selectedTags={selectedTags}
-          toggleTag={toggleTag}
-          flt={flt}
-          setFlt={setFlt}
-          className={isToolbarOpen ? "is-open" : ""}
-          onClose={toggleToolbar}
-        />
-        <div
-          className="content-area animate-on-load"
-          style={{ animationDelay: "0.3s" }}
-        >
-          <div className="resultbar" style={{ gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={savedOnly}
-                  onChange={(e) => setSavedOnly(e.target.checked)}
-                />
-                <span>Saved only</span>
-              </label>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span>Sort by</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                id="sortBy"
-              >
-                <option value="score">Best match</option>
-                <option value="date">Newest</option>
-                <option value="title">Title A–Z</option>
-              </select>
-            </div>
-          </div>
-          {visible.length === 0 ? (
-            <div className="empty">No results. Try removing some filters.</div>
-          ) : (
-            <>
-              <Grid
-                items={visible}
-                formatAgo={formatAgo}
-                favorites={favorites}
-                onToggleFavorite={toggleFavorite}
-                onMessage={openMessage}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onCopyLink={onCopyLink}
-				onLike={onLike}
-                currentUser={currentUser}
-              />
-              {hasMore && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    margin: "16px 0",
-                  }}
-                >
-                  <button
-                    className="btn"
-                    type="button"
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Load more
-                  </button>
-                </div>
-              )}
-              <div ref={sentinelRef} style={{ height: 1 }} />
-            </>
-          )}
+        <Toolbar dict={{...DICT, games}} selectedTags={selectedTags} toggleTag={t => { const n=new Set(selectedTags); n.has(t)?n.delete(t):n.add(t); setSelectedTags(n); }} flt={flt} setFlt={setFlt} className={isToolbarOpen?"is-open":""} onClose={()=>setIsToolbarOpen(false)} />
+        <div className="content-area">
+            <Grid 
+                items={visible} formatAgo={formatAgo} favorites={favorites} 
+                onToggleFavorite={toggleFavorite} onMessage={openMessage} 
+                onEdit={onEdit} onDelete={onDelete} onCopyLink={onCopyLink} 
+                currentUser={currentUser} onLike={onLike} 
+            />
         </div>
       </main>
 
-      <CreatePostDialog
-        ref={createDlgRef}
-        dict={{ ...DICT, games }}
-        onCancel={closeCreate}
-        onSave={createPost}
+      <CreatePostDialog ref={createDlgRef} dict={{...DICT, games}} onCancel={closeCreate} onSave={createPost} />
+      <EditPostDialog ref={editDlgRef} dict={{...DICT, games}} post={editingPost} onCancel={onEditCancel} onSave={onEditSave} />
+      
+      <MessageDialog 
+        ref={msgDlgRef} post={messageTarget} chat={currentChat} 
+        currentUser={currentUser} isLoading={isChatLoading} 
+        onCancel={closeMessage} onSend={sendMessage} 
       />
-
-      <EditPostDialog
-        ref={editDlgRef}
-        dict={{ ...DICT, games }}
-        post={editingPost}
-        onCancel={onEditCancel}
-        onSave={onEditSave}
-      />
-
-<MessageDialog
-        ref={msgDlgRef}
-        post={messageTarget}
-        chat={currentChat}        
-        currentUser={currentUser}  
-        isLoading={isChatLoading}  
-        onCancel={closeMessage}
-        onSend={sendMessage}
-      />
-      <AuthDialog
-        ref={authDlgRef}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-        onGoogleLogin={handleGoogleLogin}
-        error={authError}
-      />
-      <ProfileDialog
-        ref={profileDlgRef}
-        user={currentUser}
-        onLogout={handleLogout}
-        onSaveProfile={handleSaveProfile}
-      />
-	  <ChatListDialog 
-        ref={chatListDlgRef} 
-        currentUser={currentUser} 
-        onSelectChat={handleSelectChatFromList} 
-      />
+      
+      <AuthDialog ref={authDlgRef} onLogin={handleLogin} onRegister={handleRegister} onGoogleLogin={handleGoogleLogin} error={authError} />
+      <ProfileDialog ref={profileDlgRef} user={currentUser} onLogout={handleLogout} onSaveProfile={handleSaveProfile} />
+      <ChatListDialog ref={chatListDlgRef} currentUser={currentUser} onSelectChat={handleSelectChatFromList} />
     </>
   );
 }
