@@ -1,2 +1,7 @@
-// vite.config.js
-base: '/teammate-finder/',
+import { defineConfig } from 'vite'
+// ...
+export default defineConfig({
+  plugins: [react()],
+  base: '/teammate-finder/',
+  // ...
+})
