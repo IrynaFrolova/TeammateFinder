@@ -17,7 +17,13 @@ const io = new Server(server);
 // --- НАЛАШТУВАННЯ MIDDLEWARE ---
 app.use(express.json()); // Дозволяє читати JSON з тіла запиту
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'dist'))); // Роздаємо зібраний фронтенд
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// --- ФОЛБЕК ДЛЯ REACT ROUTER ---
+// Це потрібно, щоб React обробляв всі шляхи сам, а сервер віддавав index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 // --- ПІДКЛЮЧЕННЯ ДО MONGODB ATLAS ---
 const MONGODB_URI = process.env.MONGODB_URI;
