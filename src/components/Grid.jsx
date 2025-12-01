@@ -10,6 +10,7 @@ export default function Grid({
   onDelete,
   onCopyLink,
   currentUser,
+  onLike // <--- Додали функцію лайка
 }) {
   const [expanded, setExpanded] = useState(() => new Set());
 
@@ -27,12 +28,20 @@ export default function Grid({
   return (
     <section className="grid" id="grid">
       {items.map((p, index) => {
-        const score = typeof p._score === "number" ? p._score : 0;
         const fav = favorites.has(p.id);
         const opened = expanded.has(p.id);
+        
+        // --- ЛОГІКА ДОСТУПУ (АВТОР АБО АДМІН) ---
+        const canEdit = (currentUser && p.author && currentUser.username === p.author.name) || (currentUser?.isAdmin);
 
-        // Перевіряємо, чи може поточний користувач редагувати/видаляти пост
-        const canEdit = currentUser && currentUser.username === p.author.name;
+        // --- ЛОГІКА АВАТАРА ---
+        const avatarSrc = p.author?.avatar 
+            ? p.author.avatar 
+            : `https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(p.author?.name || "anon")}`;
+
+        // --- ЛОГІКА ЛАЙКА ---
+        const isLiked = p.likes && currentUser && p.likes.includes(currentUser.id);
+        const likesCount = p.likes ? p.likes.length : 0;
 
         return (
           <article
@@ -45,13 +54,15 @@ export default function Grid({
           >
             <div className="card__head">
               <div className="card__head-left">
+                {/* АВАТАР */}
                 <img
                   className="avatar"
-                  src={`https://api.dicebear.com/7.x/thumbs/svg?seed=${encodeURIComponent(
-                    p.author?.name || "anon"
-                  )}`}
+                  src={avatarSrc}
                   alt={p.author?.name || "User"}
+                  style={{ objectFit: "cover", background: "#eee" }} 
                 />
+                
+                {/* ТЕКСТ ШАПКИ */}
                 <div>
                   <div className="titleline">
                     <h4 className="title">{p.title}</h4>
@@ -60,42 +71,50 @@ export default function Grid({
                     )}
                   </div>
                   <div className="meta">
-                    {p.game} • {p.level} • {p.lang} • {p.platform} • {p.time} •{" "}
-                    {formatAgo(p.createdAt)}
+                    <span style={{ fontWeight: "bold", color: "var(--text-main)" }}>{p.author?.name}</span> • {p.game} • {p.level} • {p.lang} • {p.platform} • {formatAgo(p.createdAt)}
                   </div>
                 </div>
               </div>
 
-              {canEdit && (
-                <div className="card__actions">
+              {/* КНОПКИ ДІЙ (Справа зверху) */}
+              <div className="card__actions">
                   <button
                     className="btn btn--icon"
                     type="button"
                     onClick={() => onCopyLink(p.id)}
                     aria-label="Copy link"
+                    title="Copy Link"
                   >
                     🔗
                   </button>
-                  <button
-                    className="btn btn--icon"
-                    type="button"
-                    onClick={() => onEdit(p)}
-                    aria-label="Edit"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    className="btn btn--icon"
-                    type="button"
-                    onClick={() => onDelete(p.id)}
-                    aria-label="Delete"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              )}
+
+                  {/* Кнопки редагування (тільки для автора/адміна) */}
+                  {canEdit && (
+                    <>
+                      <button
+                        className="btn btn--icon"
+                        type="button"
+                        onClick={() => onEdit(p)}
+                        aria-label="Edit"
+                        title="Edit Post"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="btn btn--icon btn-icon--danger"
+                        type="button"
+                        onClick={() => onDelete(p.id)}
+                        aria-label="Delete"
+                        title="Delete Post"
+                      >
+                        🗑️
+                      </button>
+                    </>
+                  )}
+              </div>
             </div>
 
+            {/* ОПИС */}
             <p className={`desc ${opened ? "desc--open" : ""}`}>{p.desc}</p>
             {p.desc && p.desc.length > 120 && (
               <button
@@ -107,6 +126,7 @@ export default function Grid({
               </button>
             )}
 
+            {/* ТЕГИ */}
             <div className="tags">
               {p.tags.map((t) => (
                 <span className="tag" key={t}>
@@ -115,11 +135,30 @@ export default function Grid({
               ))}
             </div>
 
-            <div className="card__foot">
-              <div className="score" title="match score">
-                ★ {score}
-              </div>
+            {/* ФУТЕР (Кнопки внизу) */}
+            <div className="card__foot" style={{ justifyContent: "flex-end" }}> 
+              
               <div style={{ display: "flex", gap: 8 }}>
+                
+                {/* --- НОВА КНОПКА ЛАЙК --- */}
+                <button
+                  className="btn"
+                  onClick={() => onLike(p.id)}
+                  type="button"
+                  style={{ 
+                      minWidth: '60px', 
+                      borderColor: isLiked ? '#ffd700' : 'var(--border)',
+                      color: isLiked ? '#d4af37' : 'var(--text-main)'
+                  }}
+                  title="Like"
+                >
+                  {isLiked ? "★" : "☆"} 
+                  <span style={{marginLeft: 6, fontWeight: 'bold'}}>
+                      {likesCount}
+                  </span>
+                </button>
+
+                {/* Кнопка SAVE (Локально) */}
                 <button
                   className="btn"
                   onClick={() => onToggleFavorite(p.id)}
@@ -127,13 +166,17 @@ export default function Grid({
                 >
                   {fav ? "★ Saved" : "☆ Save"}
                 </button>
-                <button
-                  className="btn btn--primary"
-                  type="button"
-                  onClick={() => onMessage(p)}
-                >
-                  Message
-                </button>
+                
+                {/* Кнопка MESSAGE */}
+                {(!currentUser || currentUser.username !== p.author.name) && (
+                    <button
+                    className="btn btn--primary"
+                    type="button"
+                    onClick={() => onMessage(p)}
+                    >
+                    Message
+                    </button>
+                )}
               </div>
             </div>
           </article>

@@ -1,31 +1,22 @@
-# === Зависимости ===
-# Node (Frontend)
-/node_modules
-
-# PHP (Backend)
-/api/vendor
-/api/composer.lock
+Залежності
+node_modules
+package-lock.json
+yarn.lock
 
 
-# === Сборка проекта ===
-/dist
+dist
+build
 
 
-# === Логи ===
+.env
+.env.local
+.env.*.local
+
+Системні файли
+.DS_Store
+Thumbs.db
+
+Логи
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-
-# === Файлы IDE и ОС ===
-.vscode/
-.idea/
-.DS_Store
-
-
-# === Секреты и переменные окружения ===
-# Секретный ключ API для PHP
-/api/config.php
-
-# Файлы переменных окружения
-.env*

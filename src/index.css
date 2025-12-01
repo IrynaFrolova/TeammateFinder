@@ -1,68 +1,223 @@
+/* =======================================================
+   1. ГЛОБАЛЬНІ ЗМІННІ (THEMING)
+   ======================================================= */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  color-scheme: light; /* Базовий режим для сторінки */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --bg-body: #f0f2f5;
+  --bg-surface: #ffffff;
+  --border: #ddd;
+  
+  --text-main: #1a1a1a;
+  --text-secondary: #65676b;
+  
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --on-primary: #ffffff;
+  
+  --shadow: rgba(0, 0, 0, 0.1);
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-body: #121212;
+  --bg-surface: #1e1e1e;
+  --border: #444;
+  
+  --text-main: #e4e6eb;
+  --text-secondary: #b0b3b8;
+  
+  --primary: #ffd700;
+  --primary-hover: #ffcc00;
+  --on-primary: #000000;
+  
+  --shadow: rgba(0, 0, 0, 0.5);
 }
-a:hover {
-  color: #535bf2;
-}
+
+/* =======================================================
+   2. БАЗА
+   ======================================================= */
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  transition: background-color 0.3s, color 0.3s;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* =======================================================
+   3. ПОЛЯ ВВОДУ (UNIVERSAL DARK STYLE) - FIX 🛠️
+   Ми робимо їх завжди темними, щоб текст був білим і читабельним усюди.
+   ======================================================= */
+input, textarea, select {
+  /* Жорстко задаємо темний стиль */
+  background-color: #2b2b2b !important;
+  color: #ffffff !important;
+  border: 1px solid #555 !important;
+  
+  /* Кажемо браузеру рендерити контроли як темні */
+  color-scheme: dark !important; 
+  
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 100%;
+  display: block;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+/* Прибираємо дефолтні стилі при фокусі */
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: -1px;
+  border-color: transparent !important;
+  background-color: #333 !important;
+}
+
+/* Колір placeholder */
+::placeholder {
+  color: #aaa !important;
+  opacity: 1;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* =======================================================
+   4. КНОПКИ
+   ======================================================= */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.btn:hover { background-color: var(--border); }
+
+.btn--primary {
+  background-color: var(--primary);
+  color: var(--on-primary);
+  border: none;
+}
+.btn--primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-icon {
+  background: transparent; border: none; cursor: pointer;
+  font-size: 18px; color: var(--text-main);
+  padding: 8px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-icon:hover { background-color: rgba(128,128,128,0.2); }
+.btn-icon--danger:hover { background-color: #fee2e2; color: #dc2626; }
+
+.btn--small { padding: 4px 8px; font-size: 12px; }
+.btn--ghost { background: transparent; border: none; color: var(--text-secondary); }
+.btn--ghost:hover { color: var(--primary); text-decoration: underline; }
+
+/* =======================================================
+   5. МОДАЛКИ (DIALOGS)
+   ======================================================= */
+dialog {
+  border: none; border-radius: 12px; padding: 0;
+  background: var(--bg-surface); color: var(--text-main);
+  box-shadow: 0 10px 25px var(--shadow);
+  max-width: 500px; width: 90%;
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+
+.modal__head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid var(--border); font-size: 18px;
+}
+.modal__body { padding: 20px; }
+.modal__foot {
+  padding: 16px 20px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+
+.chat-list-dialog .modal__body { padding: 0; }
+.msg-dialog { max-width: 600px; height: 600px; max-height: 90vh; display: flex; flex-direction: column; }
+
+/* =======================================================
+   6. КАРТКИ (GRID)
+   ======================================================= */
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+.main-layout { display: flex; flex-direction: column; padding-top: 20px; }
+
+.toolbar {
+  margin-bottom: 20px; padding: 16px;
+  background: var(--bg-surface); border-radius: 12px; border: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px; padding-bottom: 40px;
+}
+
+.card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; display: flex; flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+  transform: translateY(-3px); box-shadow: 0 8px 16px var(--shadow);
+  border-color: var(--primary);
+}
+
+.card__head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.card__head-left { display: flex; gap: 12px; align-items: flex-start; }
+
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  object-fit: cover; border: 1px solid var(--border);
+  background-color: #2b2b2b; color: white;
+}
+
+.title { font-size: 16px; font-weight: 700; margin: 0; color: var(--text-main); }
+.meta { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+.desc {
+  font-size: 14px; line-height: 1.5; color: var(--text-main);
+  margin-bottom: 12px; display: -webkit-box;
+  -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.desc--open { -webkit-line-clamp: unset; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.tag {
+  font-size: 12px; background: var(--bg-body); color: var(--text-secondary);
+  padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+}
+
+.card__actions { display: flex; gap: 4px; }
+.card__foot {
+  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+.badge--new {
+  background: var(--primary); color: var(--on-primary);
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  margin-left: 8px; vertical-align: middle;
+}
+
+@media (max-width: 768px) { 
+    .desktop-only { display: none !important; } 
+    .header { padding: 10px 16px; height: 60px; }
+    .card__actions { flex-direction: column; }
 }

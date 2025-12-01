@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профіль і Чат</title>
+    <link rel="stylesheet" href="profile-chat.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Профіль користувача</h1>
+        <div class="profile-info">
+            <p><strong>Ім'я:</strong> Тестовий Користувач</p>
+            <p><strong>Роль:</strong> Розробник</p>
+        </div>
+        
+        <div class="chat-section">
+            <h2>Командний чат</h2>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Введіть повідомлення...">
+                <button onclick="sendMessage()">Надіслати</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="chat.js"></script>
+</body>
+</html>
