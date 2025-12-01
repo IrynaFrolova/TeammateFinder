@@ -129,7 +129,7 @@ export default function App() {
 
   // --- 2. ЗАВАНТАЖЕННЯ: Беремо пости з сервера ---
   useEffect(() => {
-    fetch('/api/posts')
+    fetch('${API_BASE}/posts')
         .then(res => res.json())
         .then(data => {
             if (Array.isArray(data)) {
@@ -155,7 +155,7 @@ export default function App() {
     
     if (storedId && storedName) {
         // Спробуємо підтягнути актуальний профіль з сервера
-        fetch(`/api/users/${storedName}`)
+        fetch(`${API_BASE}/users/${storedName}`)
             .then(res => res.json())
             .then(data => {
                 setCurrentUser({ 
@@ -206,7 +206,7 @@ export default function App() {
   const handleSaveProfile = async (newProfileData) => {
     if (!currentUser) return;
     try {
-      const response = await fetch(`/api/users/${currentUser.id}`, {
+      const response = await fetch(`${API_BASE}/users/${currentUser.id}`, {
          method: 'PUT',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify(newProfileData)
@@ -235,7 +235,7 @@ export default function App() {
     }
 
     try {
-        const response = await fetch(`/api/posts/${id}/like`, {
+        const response = await fetch(`${API_BASE}/posts/${id}/like`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: currentUser.id })
@@ -268,7 +268,7 @@ export default function App() {
   const handleGoogleLogin = async (googleResponse) => {
     // googleResponse містить credential (це і є токен)
     try {
-        const response = await fetch('/api/google-login', {
+        const response = await fetch('${API_BASE}/google-login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: googleResponse.credential })
@@ -343,7 +343,7 @@ export default function App() {
     
     try {
         // Питаємо сервер: "Дай чат для цього посту"
-        const response = await fetch('/api/chats', {
+        const response = await fetch('${API_BASE}/chats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -380,7 +380,7 @@ export default function App() {
       if (!currentChat || !currentUser) return;
 
       try {
-          await fetch(`/api/chats/${currentChat._id}/messages`, {
+          await fetch(`${API_BASE}/chats/${currentChat._id}/messages`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -511,7 +511,7 @@ export default function App() {
     };
 
     try {
-        const response = await fetch('/api/posts', {
+        const response = await fetch('${API_BASE}/posts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newPostData)
@@ -580,7 +580,7 @@ const onEditSave = async (id, obj) => {
 
     try {
         // 2. Відправляємо на сервер
-        const response = await fetch(`/api/posts/${id}`, {
+        const response = await fetch(`${API_BASE}/posts/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updatedData)
@@ -620,7 +620,7 @@ const onEditSave = async (id, obj) => {
     if (!confirm("Видалити це оголошення?")) return;
     
     try {
-        const response = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE}/posts/${id}`, { method: 'DELETE' });
 
         if (response.ok) {
             setPosts((list) => list.filter((p) => p.id !== id));
